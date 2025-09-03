@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard with Google Images</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      text-align: center;
+      color: white;
+    }
+
+    /* Background image */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: url("image_2025-09-02_221229100.png") no-repeat center center fixed;
+      background-size: cover;
+      z-index: -2;
+    }
+
+    /* Dark overlay to improve contrast */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: -1;
+    }
+
+    .dashboard { padding: 20px; background: rgba(51, 51, 51, 0.8); }
+    .dashboard button { margin: 5px; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; }
+    .search-container { margin: 20px; }
+    input[type="text"] { width: 300px; padding: 10px; font-size: 16px; border-radius: 6px; border: none; }
+
+    #gallery { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+      gap: 10px; 
+      padding: 20px; 
+    }
+    #gallery img { width: 100%; border-radius: 8px; cursor: pointer; transition: transform 0.2s; }
+    #gallery img:hover { transform: scale(1.05); }
+
+    /* Modal styling */
+    #modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
+      justify-content: center;
+      align-items: flex-start;
+      overflow-y: auto;
+    }
+    #modalContent {
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 800px;
+      margin: 60px auto;
+      text-align: center;
+    }
+    #modal img { max-width: 100%; border-radius: 8px; }
+    .related {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .related img { width: 100%; border-radius: 6px; cursor: pointer; }
+    .close {
+      position: absolute;
+      top: 20px; right: 30px;
+      font-size: 40px;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard">
+    <h1>My Dashboard</h1>
+    <button onclick="openSite('https://www.wikipedia.org')">Wikipedia</button>
+    <button onclick="openSite('https://www.behance.net')">Behance</button>
+    <button onclick="document.getElementById('search-section').style.display='block'">Image Search</button>
+  </div>
+
+  <iframe id="siteFrame" style="width:100%; height:400px; border:none;"></iframe>
+
+  <div id="search-section" style="display:none;">
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search Google Images...">
+      <button onclick="newSearch()">Search</button>
+    </div>
+    <div id="gallery"></div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <div id="modalContent">
+      <img id="modalImg" src="" alt="">
+      <h3>Related Images</h3>
+      <div class="related" id="relatedGallery"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_KEY = "AIzaSyBWKLJGGXoowq3TWzd2I-jkgBF8ykkK-d4";
+    const CX = "108d1ced4922d49c7";
+
+    let currentQuery = "";
+    let startIndex = 1;
+    let loading = false;
+
+    function openSite(url) {
+      document.getElementById('siteFrame').src = url;
+    }
+
+    function newSearch() {
+      currentQuery = document.getElementById("searchInput").value;
+      if (!currentQuery) return;
+      startIndex = 1;
+      document.getElementById("gallery").innerHTML = "";
+      searchImages();
+    }
+
+    async function searchImages() {
+      if (loading) return;
+      loading = true;
+
+      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(currentQuery)}&cx=${CX}&searchType=image&key=${API_KEY}&start=${startIndex}`;
+      startIndex += 10;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const gallery = document.getElementById("gallery");
+
+      if (data.items) {
+        data.items.forEach(item => {
+          const img = document.createElement("img");
+          img.src = item.link;
+          img.alt = item.title;
+          img.onclick = () => openModal(item.link, item.title);
+          gallery.appendChild(img);
+        });
+      }
+
+      loading = false;
+    }
+
+    window.addEventListener("scroll", () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        searchImages();
+      }
+    });
+
+    let modalQuery = "";
+    let modalStartIndex = 1;
+    let modalLoading = false;
+
+    async function openModal(imgUrl, query) {
+      document.getElementById("modal").style.display = "flex";
+      document.getElementById("modalImg").src = imgUrl;
+      document.getElementById("relatedGallery").innerHTML = "";
+
+      modalQuery = query;
+      modalStartIndex = 1;
+      loadRelatedImages();
+    }
+
+    async function loadRelatedImages() {
+      if (modalLoading) return;
+      modalLoading = true;
+
+      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(modalQuery)}&cx=${CX}&searchType=image&key=${API_KEY}&start=${modalStartIndex}`;
+      modalStartIndex += 10;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const relatedGallery = document.getElementById("relatedGallery");
+
+      if (data.items) {
+        data.items.forEach(item => {
+          const relatedImg = document.createElement("img");
+          relatedImg.src = item.link;
+          relatedImg.alt = item.title;
+          relatedImg.onclick = () => openModal(item.link, item.title);
+          relatedGallery.appendChild(relatedImg);
+        });
+      }
+
+      modalLoading = false;
+    }
+
+    document.getElementById("modal").addEventListener("scroll", () => {
+      const modal = document.getElementById("modal");
+      if (modal.scrollTop + modal.clientHeight >= modal.scrollHeight - 300) {
+        loadRelatedImages();
+      }
+    });
+
+    function closeModal() {
+      document.getElementById("modal").style.display = "none";
+    }
+
+    document.getElementById("searchInput").addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        newSearch();
+      }
+    });
+  </script>
+
+</body>
+</html>
